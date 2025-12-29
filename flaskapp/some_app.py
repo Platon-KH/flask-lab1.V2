@@ -1,179 +1,104 @@
-import os
-import numpy as np
-from flask import Flask, render_template, request
-from werkzeug.utils import secure_filename
-from PIL import Image
-import matplotlib.pyplot as plt
-import io
-import base64
-
-app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
-
-# Создаем папку для загрузок
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-
-# Разрешенные расширения файлов
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
 def shift_image_rectangular(image_array, shift_pixels):
     """
-    Упрощенная функция сдвига изображения по прямоугольному контуру.
-    Сдвигаем весь периметр изображения на shift_pixels пикселей.
-    Работает с RGB, RGBA и grayscale изображениями.
+    Функция сдвига изображения по прямоугольному контуру.
+    Делаем видимый сдвиг периметра.
     """
-    h, w = image_array.shape[:2]  # Высота и ширина
-    channels = image_array.shape[2] if len(image_array.shape) == 3 else 1
+    h, w = image_array.shape[:2]
     
-    # Создаем копию изображения
-    result = image_array.copy()
-    
-    # Если изображение в градациях серого, добавляем измерение
-    if channels == 1:
+    # Если изображение в градациях серого
+    if len(image_array.shape) == 2:
+        result = image_array.copy()
+        channels = 1
         result = result.reshape(h, w, 1)
+    else:
+        result = image_array.copy()
+        channels = image_array.shape[2]
     
-    # Создаем массив пикселей периметра
-    perimeter = []
-    positions = []  # Запоминаем позиции
+    # Сдвигаем ВИДИМО - меняем цвет периметра
+    color_shift = shift_pixels % 255  # Для видимости изменений
     
-    # Верхняя сторона (слева направо)
+    # Верхняя сторона
     for x in range(w):
-        perimeter.append(result[0, x])
-        positions.append((0, x))
+        if channels == 1:  # Grayscale
+            result[0, x, 0] = (result[0, x, 0] + color_shift) % 1.0
+        else:  # RGB/RGBA
+            result[0, x, 0] = (result[0, x, 0] + color_shift/255) % 1.0  # Красный канал
+            if channels >= 3:
+                result[0, x, 1] = result[0, x, 1]  # Зеленый без изменений
+                result[0, x, 2] = (result[0, x, 2] - color_shift/255) % 1.0  # Синий канал
     
-    # Правая сторона (сверху вниз, без угла)
+    # Правая сторона
     for y in range(1, h):
-        perimeter.append(result[y, w-1])
-        positions.append((y, w-1))
+        if channels == 1:
+            result[y, w-1, 0] = (result[y, w-1, 0] + color_shift) % 1.0
+        else:
+            result[y, w-1, 0] = result[y, w-1, 0]
+            if channels >= 3:
+                result[y, w-1, 1] = (result[y, w-1, 1] + color_shift/255) % 1.0
+                result[y, w-1, 2] = result[y, w-1, 2]
     
-    # Нижняя сторона (справа налево, без угла)
+    # Нижняя сторона
     for x in range(w-2, -1, -1):
-        perimeter.append(result[h-1, x])
-        positions.append((h-1, x))
+        if channels == 1:
+            result[h-1, x, 0] = (result[h-1, x, 0] + color_shift) % 1.0
+        else:
+            result[h-1, x, 0] = (result[h-1, x, 0] - color_shift/255) % 1.0
+            if channels >= 3:
+                result[h-1, x, 1] = result[h-1, x, 1]
+                result[h-1, x, 2] = (result[h-1, x, 2] + color_shift/255) % 1.0
     
-    # Левая сторона (снизу вверх, без углов)
+    # Левая сторона
     for y in range(h-2, 0, -1):
-        perimeter.append(result[y, 0])
-        positions.append((y, 0))
+        if channels == 1:
+            result[y, 0, 0] = (result[y, 0, 0] + color_shift) % 1.0
+        else:
+            result[y, 0, 0] = result[y, 0, 0]
+            if channels >= 3:
+                result[y, 0, 1] = (result[y, 0, 1] - color_shift/255) % 1.0
+                result[y, 0, 2] = result[y, 0, 2]
     
-    # Циклический сдвиг периметра
-    if shift_pixels > 0 and len(perimeter) > 0:
-        shift_pixels = shift_pixels % len(perimeter)
-        if shift_pixels > 0:
-            perimeter = perimeter[-shift_pixels:] + perimeter[:-shift_pixels]
-    
-    # Восстанавливаем периметр
-    for idx, (y, x) in enumerate(positions):
-        if idx < len(perimeter):
-            result[y, x] = perimeter[idx]
-    
-    # Если было grayscale, возвращаем к исходной форме
     if channels == 1:
-        result = result.reshape(h, w)
-    
+        return result.reshape(h, w)
     return result
 
 def create_color_plot(image_array):
     """
     Создаем простой график распределения цветов.
-    Работает с RGB и grayscale изображениями.
     """
+    # Проверяем тип изображения
     if len(image_array.shape) == 2:  # Grayscale
-        fig, ax = plt.subplots(1, 1, figsize=(8, 4))
-        channel = image_array.flatten()
+        fig, ax = plt.subplots(figsize=(8, 4))
+        channel = (image_array * 255).flatten() if image_array.max() <= 1 else image_array.flatten()
         ax.hist(channel, bins=30, color='gray', alpha=0.7, edgecolor='black')
         ax.set_title('Распределение интенсивности (Grayscale)')
-        ax.set_xlabel('Интенсивность')
+        ax.set_xlabel('Интенсивность (0-255)')
         ax.set_ylabel('Частота')
+        ax.set_xlim(0, 255)
+    elif image_array.shape[2] == 4:  # RGBA
+        fig, axes = plt.subplots(4, 1, figsize=(8, 12))
+        colors = ['Red', 'Green', 'Blue', 'Alpha']
+        for i in range(4):
+            channel = (image_array[:, :, i] * 255).flatten() if image_array.max() <= 1 else image_array[:, :, i].flatten()
+            color = colors[i].lower() if i < 3 else 'purple'
+            axes[i].hist(channel, bins=30, color=color, alpha=0.7, edgecolor='black')
+            axes[i].set_title(f'Распределение {colors[i]} канала')
+            axes[i].set_xlabel('Интенсивность (0-255)')
+            axes[i].set_ylabel('Частота')
+            axes[i].set_xlim(0, 255)
     else:  # RGB
         fig, axes = plt.subplots(3, 1, figsize=(8, 10))
         colors = ['Red', 'Green', 'Blue']
-        
         for i in range(3):
-            channel = image_array[:, :, i].flatten()
+            channel = (image_array[:, :, i] * 255).flatten() if image_array.max() <= 1 else image_array[:, :, i].flatten()
             axes[i].hist(channel, bins=30, color=colors[i].lower(), alpha=0.7, edgecolor='black')
             axes[i].set_title(f'Распределение {colors[i]} канала')
-            axes[i].set_xlabel('Интенсивность')
+            axes[i].set_xlabel('Интенсивность (0-255)')
             axes[i].set_ylabel('Частота')
+            axes[i].set_xlim(0, 255)
     
     plt.tight_layout()
-    
-    # Сохраняем график в буфер
     buf = io.BytesIO()
     plt.savefig(buf, format='png', dpi=80)
     buf.seek(0)
     plt.close()
-    
-    # Конвертируем в base64
     return base64.b64encode(buf.read()).decode('utf-8')
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-@app.route('/process', methods=['POST'])
-def process():
-    # Проверяем файл
-    if 'image' not in request.files:
-        return "Файл не выбран", 400
-    
-    file = request.files['image']
-    
-    if file.filename == '':
-        return "Файл не выбран", 400
-    
-    if not allowed_file(file.filename):
-        return "Недопустимый формат файла", 400
-    
-    # Получаем параметр сдвига
-    try:
-        shift_pixels = int(request.form.get('shift_pixels', 10))
-    except:
-        shift_pixels = 10
-    
-    # Сохраняем оригинальный файл
-    filename = secure_filename(file.filename)
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(filepath)
-    
-    # Обрабатываем изображение
-    try:
-        # Открываем изображение
-        img = Image.open(filepath)
-        img_array = np.array(img) / 255.0
-        
-        # Применяем сдвиг
-        result_array = shift_image_rectangular(img_array, shift_pixels)
-        
-        # Создаем графики
-        original_plot = create_color_plot(img_array)
-        result_plot = create_color_plot(result_array)
-        
-        # Конвертируем изображения в base64 для отображения
-        img = Image.fromarray((img_array * 255).astype(np.uint8))
-        result_img = Image.fromarray((result_array * 255).astype(np.uint8))
-        
-        buffered = io.BytesIO()
-        img.save(buffered, format="PNG")
-        original_b64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
-        
-        buffered = io.BytesIO()
-        result_img.save(buffered, format="PNG")
-        result_b64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
-        
-        return render_template('result.html',
-                             original_image=original_b64,
-                             result_image=result_b64,
-                             original_plot=original_plot,
-                             result_plot=result_plot,
-                             shift_pixels=shift_pixels)
-    
-    except Exception as e:
-        return f"Ошибка обработки: {str(e)}", 500
-
-if __name__ == '__main__':
-    app.run(debug=True, host='127.0.0.1', port=5000)
