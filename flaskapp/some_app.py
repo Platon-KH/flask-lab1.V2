@@ -24,72 +24,81 @@ def shift_image_rectangular(image_array, shift_pixels):
     """
     Упрощенная функция сдвига изображения по прямоугольному контуру.
     Сдвигаем весь периметр изображения на shift_pixels пикселей.
+    Работает с RGB, RGBA и grayscale изображениями.
     """
-    h, w, _ = image_array.shape
+    h, w = image_array.shape[:2]  # Высота и ширина
+    channels = image_array.shape[2] if len(image_array.shape) == 3 else 1
+    
+    # Создаем копию изображения
     result = image_array.copy()
+    
+    # Если изображение в градациях серого, добавляем измерение
+    if channels == 1:
+        result = result.reshape(h, w, 1)
     
     # Создаем массив пикселей периметра
     perimeter = []
+    positions = []  # Запоминаем позиции
     
-    # Верхняя сторона
+    # Верхняя сторона (слева направо)
     for x in range(w):
-        perimeter.append(image_array[0, x])
+        perimeter.append(result[0, x])
+        positions.append((0, x))
     
-    # Правая сторона (без угла)
+    # Правая сторона (сверху вниз, без угла)
     for y in range(1, h):
-        perimeter.append(image_array[y, w-1])
+        perimeter.append(result[y, w-1])
+        positions.append((y, w-1))
     
-    # Нижняя сторона (без угла)
+    # Нижняя сторона (справа налево, без угла)
     for x in range(w-2, -1, -1):
-        perimeter.append(image_array[h-1, x])
+        perimeter.append(result[h-1, x])
+        positions.append((h-1, x))
     
-    # Левая сторона (без углов)
+    # Левая сторона (снизу вверх, без углов)
     for y in range(h-2, 0, -1):
-        perimeter.append(image_array[y, 0])
+        perimeter.append(result[y, 0])
+        positions.append((y, 0))
     
     # Циклический сдвиг периметра
-    if shift_pixels > 0:
+    if shift_pixels > 0 and len(perimeter) > 0:
         shift_pixels = shift_pixels % len(perimeter)
-        perimeter = perimeter[-shift_pixels:] + perimeter[:-shift_pixels]
+        if shift_pixels > 0:
+            perimeter = perimeter[-shift_pixels:] + perimeter[:-shift_pixels]
     
     # Восстанавливаем периметр
-    idx = 0
+    for idx, (y, x) in enumerate(positions):
+        if idx < len(perimeter):
+            result[y, x] = perimeter[idx]
     
-    # Верхняя сторона
-    for x in range(w):
-        result[0, x] = perimeter[idx]
-        idx += 1
-    
-    # Правая сторона
-    for y in range(1, h):
-        result[y, w-1] = perimeter[idx]
-        idx += 1
-    
-    # Нижняя сторона
-    for x in range(w-2, -1, -1):
-        result[h-1, x] = perimeter[idx]
-        idx += 1
-    
-    # Левая сторона
-    for y in range(h-2, 0, -1):
-        result[y, 0] = perimeter[idx]
-        idx += 1
+    # Если было grayscale, возвращаем к исходной форме
+    if channels == 1:
+        result = result.reshape(h, w)
     
     return result
 
 def create_color_plot(image_array):
     """
     Создаем простой график распределения цветов.
+    Работает с RGB и grayscale изображениями.
     """
-    fig, axes = plt.subplots(3, 1, figsize=(8, 10))
-    colors = ['Red', 'Green', 'Blue']
-    
-    for i in range(3):
-        channel = image_array[:, :, i].flatten()
-        axes[i].hist(channel, bins=30, color=colors[i].lower(), alpha=0.7, edgecolor='black')
-        axes[i].set_title(f'Распределение {colors[i]} канала')
-        axes[i].set_xlabel('Интенсивность')
-        axes[i].set_ylabel('Частота')
+    if len(image_array.shape) == 2:  # Grayscale
+        fig, ax = plt.subplots(1, 1, figsize=(8, 4))
+        channel = image_array.flatten()
+        ax.hist(channel, bins=30, color='gray', alpha=0.7, edgecolor='black')
+        ax.set_title('Распределение интенсивности (Grayscale)')
+        ax.set_xlabel('Интенсивность')
+        ax.set_ylabel('Частота')
+    else:  # RGB
+        fig, axes = plt.subplots(3, 1, figsize=(8, 10))
+        colors = ['Red', 'Green', 'Blue']
+        
+        for i in range(3):
+            channel = image_array[:, :, i].flatten()
+            axes[i].hist(channel, bins=30, color=colors[i].lower(), alpha=0.7, edgecolor='black')
+            axes[i].set_title(f'Распределение {colors[i]} канала')
+            axes[i].set_xlabel('Интенсивность')
+            axes[i].set_ylabel('Частота')
     
     plt.tight_layout()
     
