@@ -26,4 +26,7 @@ jobs:
     
     - name: Run tests
       run: |
+        pwd
+        ls -la
+        cd flaskapp    
         python test_app.py
