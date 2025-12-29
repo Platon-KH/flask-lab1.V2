@@ -1,1 +1,163 @@
 
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Результаты обработки</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            color: #333;
+            text-align: center;
+        }
+        .results-info {
+            background-color: #e8f5e9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+            border-left: 4px solid #4CAF50;
+        }
+        .image-container {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .image-box {
+            text-align: center;
+            flex: 1;
+            min-width: 300px;
+        }
+        .image-box img {
+            max-width: 100%;
+            height: auto;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .plot-container {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .plot-box {
+            text-align: center;
+            flex: 1;
+            min-width: 300px;
+        }
+        .plot-box img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .nav-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-primary {
+            background-color: #2196F3;
+            color: white;
+        }
+        .btn-secondary {
+            background-color: #f44336;
+            color: white;
+        }
+        .btn:hover {
+            opacity: 0.9;
+        }
+        .parameters {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Результаты обработки изображения</h1>
+        
+        <div class="results-info">
+            <h2>Вариант 20: Сдвиг по прямоугольному контуру</h2>
+            <div class="parameters">
+                <p><strong>Примененный сдвиг:</strong> {{ shift_pixels }} пикселей</p>
+            </div>
+        </div>
+        
+        <h2>Изображения</h2>
+        <div class="image-container">
+            <div class="image-box">
+                <h3>Оригинальное изображение</h3>
+                <img src="data:image/png;base64,{{ original_image }}" 
+                     alt="Оригинальное изображение">
+            </div>
+            
+            <div class="image-box">
+                <h3>Обработанное изображение</h3>
+                <img src="data:image/png;base64,{{ result_image }}" 
+                     alt="Обработанное изображение">
+            </div>
+        </div>
+        
+        <h2>Распределение цветов</h2>
+        <div class="plot-container">
+            <div class="plot-box">
+                <h3>Оригинальное изображение</h3>
+                <img src="data:image/png;base64,{{ original_plot }}" 
+                     alt="График распределения цветов оригинального изображения">
+            </div>
+            
+            <div class="plot-box">
+                <h3>Обработанное изображение</h3>
+                <img src="data:image/png;base64,{{ result_plot }}" 
+                     alt="График распределения цветов обработанного изображения">
+            </div>
+        </div>
+        
+        <div class="nav-buttons">
+            <a href="/" class="btn btn-primary">Обработать другое изображение</a>
+            <a href="/" class="btn btn-secondary">На главную</a>
+        </div>
+        
+        <div style="margin-top: 30px; padding: 15px; background-color: #f3e5f5; border-radius: 5px;">
+            <h3>Анализ результатов:</h3>
+            <p>Сравните распределение цветов на двух графиках. Обратите внимание на:</p>
+            <ul>
+                <li>Изменение интенсивности цветовых каналов</li>
+                <li>Смещение пиков распределения</li>
+                <li>Общую форму гистограмм</li>
+            </ul>
+            <p>Эти изменения показывают, как сдвиг по прямоугольному контуру 
+            повлиял на цветовое распределение изображения.</p>
+        </div>
+    </div>
+</body>
+</html>
